@@ -1,0 +1,477 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>نظام إدارة الأنشطة | Activity Management</title>
+
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+
+  <style>
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      font-family: Arial, sans-serif;
+      background: #f3f6fa;
+      color: #172033;
+    }
+
+    header {
+      background: #123b5d;
+      color: white;
+      padding: 20px;
+    }
+
+    header h1 { margin: 0 0 8px; font-size: 24px; }
+
+    .topbar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      flex-wrap: wrap;
+      gap: 12px;
+    }
+
+    main { padding: 20px; max-width: 1300px; margin: auto; }
+
+    .panel, .card {
+      background: white;
+      border-radius: 12px;
+      padding: 18px;
+      box-shadow: 0 3px 12px #1720330c;
+    }
+
+    .login {
+      max-width: 430px;
+      margin: 35px auto;
+    }
+
+    input, select, button {
+      font: inherit;
+      padding: 11px;
+      border-radius: 7px;
+      border: 1px solid #ccd5df;
+      width: 100%;
+      margin: 6px 0;
+    }
+
+    button {
+      cursor: pointer;
+      background: #176b87;
+      color: white;
+      border: none;
+      font-weight: bold;
+    }
+
+    button.secondary { background: #536579; }
+    button:disabled { opacity: .6; cursor: not-allowed; }
+
+    .stats {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+      gap: 15px;
+      margin: 20px 0;
+    }
+
+    .card h3 { margin-top: 0; color: #536579; font-size: 15px; }
+    .number { font-size: 24px; font-weight: bold; }
+
+    .activities {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+      gap: 14px;
+    }
+
+    .activity {
+      border: 1px solid #e1e7ee;
+      border-radius: 10px;
+      padding: 16px;
+      background: white;
+    }
+
+    .activity h3 { margin: 0 0 8px; color: #123b5d; }
+
+    .section-title { margin: 28px 0 14px; }
+
+    .notice {
+      padding: 12px;
+      border-radius: 8px;
+      background: #edf5f9;
+      margin: 12px 0;
+      line-height: 1.7;
+    }
+
+    .error { background: #fff0f0; color: #a21d1d; }
+    .success { background: #eaf8ee; color: #176534; }
+
+    .hidden { display: none !important; }
+    .small { font-size: 13px; color: #536579; line-height: 1.7; }
+
+    footer { text-align: center; padding: 25px; color: #657386; }
+
+    @media (max-width: 600px) {
+      main { padding: 12px; }
+      header { padding: 16px; }
+    }
+  </style>
+</head>
+
+<body>
+  <header>
+    <div class="topbar">
+      <div>
+        <h1 id="appTitle">نظام إدارة الأنشطة</h1>
+        <div id="subtitle">إدارة العقارات والمبيعات والمصروفات</div>
+      </div>
+      <button id="languageBtn" class="secondary" style="width:auto"
+              onclick="toggleLanguage()">English</button>
+    </div>
+  </header>
+
+  <main>
+    <div id="message" class="notice hidden" role="status"></div>
+
+    <section id="loginPanel" class="panel login">
+      <h2 id="loginTitle">تسجيل الدخول</h2>
+      <p id="loginDescription">أدخل بريدك الإلكتروني وكلمة المرور.</p>
+
+      <form id="loginForm">
+        <label id="emailLabel" for="email">البريد الإلكتروني</label>
+        <input id="email" type="email" autocomplete="username" required>
+
+        <label id="passwordLabel" for="password">كلمة المرور</label>
+        <input id="password" type="password"
+               autocomplete="current-password" required>
+
+        <button id="loginBtn" type="submit">دخول</button>
+      </form>
+
+      <p class="small" id="loginHelp">
+        استخدم حسابك الذي أنشأته في Supabase Authentication.
+      </p>
+    </section>
+
+    <section id="dashboard" class="hidden">
+      <div class="topbar">
+        <div>
+          <h2 id="welcomeTitle">لوحة التحكم</h2>
+          <div id="userInfo" class="small"></div>
+        </div>
+        <button id="logoutBtn" class="secondary" style="width:auto"
+                onclick="logout()">تسجيل الخروج</button>
+      </div>
+
+      <div class="notice" id="connectionStatus">
+        جارٍ التحقق من الاتصال...
+      </div>
+
+      <div class="stats">
+        <div class="card">
+          <h3 id="activitiesLabel">عدد الأنشطة</h3>
+          <div class="number" id="activitiesCount">—</div>
+        </div>
+        <div class="card">
+          <h3 id="salesLabel">عدد سجلات المبيعات</h3>
+          <div class="number" id="salesCount">—</div>
+        </div>
+        <div class="card">
+          <h3 id="expensesLabel">عدد سجلات المصروفات</h3>
+          <div class="number" id="expensesCount">—</div>
+        </div>
+        <div class="card">
+          <h3 id="rentalsLabel">عدد عقود الإيجار</h3>
+          <div class="number" id="rentalsCount">—</div>
+        </div>
+      </div>
+
+      <h2 class="section-title" id="activitiesTitle">الأنشطة الثمانية</h2>
+      <div id="activitiesList" class="activities"></div>
+
+      <h2 class="section-title" id="nextTitle">الأقسام المخطط لها</h2>
+      <div class="panel">
+        <p id="plannedFeatures">
+          تسجيل المبيعات والأصناف، إدارة المخزون، الإيجارات، الصيانة،
+          المصروفات، والتقارير اليومية والشهرية والسنوية.
+        </p>
+        <p class="small" id="plannedNote">
+          هذه النسخة تعرض بيانات الاتصال الأساسية فقط. لم تُفعّل بعد
+          عمليات إضافة المعاملات أو احتساب الأرباح.
+        </p>
+      </div>
+    </section>
+  </main>
+
+  <footer>Activity Management System</footer>
+
+  <script>
+    // إعدادات مشروع Supabase
+    const SUPABASE_URL = "https://hwpefoptxujbrnxsngrr.supabase.co";
+    const SUPABASE_PUBLISHABLE_KEY =
+      "sb_publishable_B8dlwDp1bk3jK3MSSEQsYg_uWrVM0uH";
+
+    const db = window.supabase.createClient(
+      SUPABASE_URL,
+      SUPABASE_PUBLISHABLE_KEY
+    );
+
+    let language = "ar";
+
+    const translations = {
+      ar: {
+        title: "نظام إدارة الأنشطة",
+        subtitle: "إدارة العقارات والمبيعات والمصروفات",
+        login: "تسجيل الدخول",
+        description: "أدخل بريدك الإلكتروني وكلمة المرور.",
+        email: "البريد الإلكتروني",
+        password: "كلمة المرور",
+        enter: "دخول",
+        help: "استخدم حسابك الذي أنشأته في Supabase Authentication.",
+        welcome: "لوحة التحكم",
+        logout: "تسجيل الخروج",
+        activities: "عدد الأنشطة",
+        sales: "عدد سجلات المبيعات",
+        expenses: "عدد سجلات المصروفات",
+        rentals: "عدد عقود الإيجار",
+        activitiesTitle: "الأنشطة الثمانية",
+        next: "الأقسام المخطط لها",
+        planned: "تسجيل المبيعات والأصناف، إدارة المخزون، الإيجارات، الصيانة، المصروفات، والتقارير اليومية والشهرية والسنوية.",
+        note: "هذه النسخة تعرض بيانات الاتصال الأساسية فقط. لم تُفعّل بعد عمليات إضافة المعاملات أو احتساب الأرباح.",
+        loading: "جارٍ التحقق من الاتصال...",
+        connected: "تم تسجيل الدخول بنجاح.",
+        denied: "لم يتم العثور على ملف مستخدم في profiles أو أن صلاحيات القراءة غير متاحة. يرجى مراجعة إعداد الحساب والصلاحيات.",
+        activityError: "تعذر تحميل الأنشطة. تحقق من اتصال قاعدة البيانات وسياسات الوصول.",
+        loginError: "تعذر تسجيل الدخول. تحقق من البريد الإلكتروني وكلمة المرور.",
+        loginRequired: "يرجى تسجيل الدخول أولًا.",
+        noActivities: "لا توجد أنشطة لعرضها.",
+        lang: "English"
+      },
+      en: {
+        title: "Activity Management System",
+        subtitle: "Property, sales and expense management",
+        login: "Sign in",
+        description: "Enter your email and password.",
+        email: "Email address",
+        password: "Password",
+        enter: "Sign in",
+        help: "Use the account you created in Supabase Authentication.",
+        welcome: "Dashboard",
+        logout: "Sign out",
+        activities: "Activities",
+        sales: "Sales records",
+        expenses: "Expense records",
+        rentals: "Rental contracts",
+        activitiesTitle: "The Eight Activities",
+        next: "Planned Sections",
+        planned: "Sales and items, inventory, rentals, maintenance, expenses, and daily, monthly and yearly reports.",
+        note: "This version displays basic connection data only. Transaction entry and profit calculations are not enabled yet.",
+        loading: "Checking connection...",
+        connected: "Signed in successfully.",
+        denied: "No profile was found or profile access is unavailable. Check account setup and permissions.",
+        activityError: "Could not load activities. Check the database connection and access policies.",
+        loginError: "Sign-in failed. Check your email and password.",
+        loginRequired: "Please sign in first.",
+        noActivities: "No activities found.",
+        lang: "العربية"
+      }
+    };
+
+    function t(key) {
+      return translations[language][key] || key;
+    }
+
+    function showMessage(text, type = "") {
+      const el = document.getElementById("message");
+      el.textContent = text;
+      el.className = "notice" + (type ? " " + type : "");
+    }
+
+    function clearMessage() {
+      const el = document.getElementById("message");
+      el.textContent = "";
+      el.className = "notice hidden";
+    }
+
+    function toggleLanguage() {
+      language = language === "ar" ? "en" : "ar";
+      document.documentElement.lang = language;
+      document.documentElement.dir = language === "ar" ? "rtl" : "ltr";
+      applyTranslations();
+      loadActivities();
+    }
+
+    function applyTranslations() {
+      const values = {
+        appTitle: "title",
+        subtitle: "subtitle",
+        loginTitle: "login",
+        loginDescription: "description",
+        emailLabel: "email",
+        passwordLabel: "password",
+        loginBtn: "enter",
+        loginHelp: "help",
+        welcomeTitle: "welcome",
+        logoutBtn: "logout",
+        activitiesLabel: "activities",
+        salesLabel: "sales",
+        expensesLabel: "expenses",
+        rentalsLabel: "rentals",
+        activitiesTitle: "activitiesTitle",
+        nextTitle: "next",
+        plannedFeatures: "planned",
+        plannedNote: "note",
+        connectionStatus: "loading",
+        languageBtn: "lang"
+      };
+
+      for (const [id, key] of Object.entries(values)) {
+        const el = document.getElementById(id);
+        if (el) el.textContent = t(key);
+      }
+    }
+
+    async function loadProfile(user) {
+      const { data, error } = await db
+        .from("profiles")
+        .select("id, full_name, role")
+        .eq("id", user.id)
+        .maybeSingle();
+
+      if (error || !data) {
+        document.getElementById("userInfo").textContent = "";
+        showMessage(t("denied"), "error");
+        return null;
+      }
+
+      document.getElementById("userInfo").textContent =
+        (data.full_name || user.email) + " — " + data.role;
+
+      return data;
+    }
+
+    async function loadCount(table, elementId) {
+      const { count, error } = await db
+        .from(table)
+        .select("*", { count: "exact", head: true });
+
+      document.getElementById(elementId).textContent =
+        error ? "—" : String(count ?? 0);
+    }
+
+    async function loadActivities() {
+      const list = document.getElementById("activitiesList");
+      list.replaceChildren();
+
+      const { data, error } = await db
+        .from("activities")
+        .select("id, code, name_ar, name_en, activity_type, is_active")
+        .eq("is_active", true)
+        .order("id");
+
+      if (error) {
+        showMessage(t("activityError"), "error");
+        return;
+      }
+
+      if (!data || data.length === 0) {
+        list.textContent = t("noActivities");
+        return;
+      }
+
+      data.forEach(activity => {
+        const card = document.createElement("article");
+        card.className = "activity";
+
+        const title = document.createElement("h3");
+        title.textContent = language === "ar"
+          ? activity.name_ar
+          : activity.name_en;
+
+        const code = document.createElement("div");
+        code.className = "small";
+        code.textContent = activity.code;
+
+        const type = document.createElement("div");
+        type.className = "small";
+        type.textContent = activity.activity_type;
+
+        card.append(title, code, type);
+        list.appendChild(card);
+      });
+    }
+
+    async function showDashboard(user) {
+      clearMessage();
+
+      const profile = await loadProfile(user);
+      if (!profile) return;
+
+      document.getElementById("loginPanel").classList.add("hidden");
+      document.getElementById("dashboard").classList.remove("hidden");
+      document.getElementById("connectionStatus").textContent = t("connected");
+
+      await Promise.all([
+        loadActivities(),
+        loadCount("sales", "salesCount"),
+        loadCount("expenses", "expensesCount"),
+        loadCount("rental_contracts", "rentalsCount")
+      ]);
+
+      await loadCount("activities", "activitiesCount");
+    }
+
+    document.getElementById("loginForm").addEventListener("submit",
+      async event => {
+        event.preventDefault();
+        clearMessage();
+
+        const button = document.getElementById("loginBtn");
+        button.disabled = true;
+
+        const email = document.getElementById("email").value.trim();
+        const password = document.getElementById("password").value;
+
+        const { data, error } = await db.auth.signInWithPassword({
+          email,
+          password
+        });
+
+        button.disabled = false;
+
+        if (error) {
+          showMessage(t("loginError"), "error");
+          return;
+        }
+
+        await showDashboard(data.user);
+      }
+    );
+
+    async function logout() {
+      await db.auth.signOut();
+      document.getElementById("dashboard").classList.add("hidden");
+      document.getElementById("loginPanel").classList.remove("hidden");
+      document.getElementById("password").value = "";
+      clearMessage();
+    }
+
+    async function init() {
+      applyTranslations();
+
+      const { data } = await db.auth.getSession();
+
+      if (data.session) {
+        await showDashboard(data.session.user);
+      }
+    }
+
+    db.auth.onAuthStateChange((_event, session) => {
+      if (session) {
+        showDashboard(session.user);
+      }
+    });
+
+    init();
+  </script>
+</body>
+</html>
